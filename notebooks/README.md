@@ -3,6 +3,7 @@
 Contains random collection of [Jupyter](https://jupyter.org/), [Quarto](https://quarto.org/), and [Pluto.jl](https://plutojl.org/) notebooks.
 
 ## File descriptions
+- [BesselFunctions.jl](BesselFunctions.jl) - Functions implementing special case of Bessel functions.
 - [SymbolicRegNotes.jl](SymbolicRegNotes.jl) - notes and playing around with SymbolicRegression.jl.
 - [ChatGPT_InPluto.html](ChatGPT_InPluto.html) - chat gpt usage in pluto notebook.
 - [PackageVersionUI.jl](PackageVersionUI.jl) - widget to show package versions.
