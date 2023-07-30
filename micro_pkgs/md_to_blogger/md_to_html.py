@@ -21,6 +21,8 @@ from pygments.lexers import get_lexer_by_name, TextLexer
 from pygments.formatters import HtmlFormatter, RawTokenFormatter
 from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
+
 
 class CodeBlockPreprocessor(Preprocessor):
     CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
@@ -166,7 +168,10 @@ class ImagePreprocessor(Preprocessor):
                 attrib={"class": "tr-caption", "style": "text-align: center;"},
             )
             # td2.text = alt_text
-            td2.text = markdown.markdown(alt_text)  # Render the alt text as Markdown
+            #td2.text = markdown.markdown(alt_text)  # Render the alt text as Markdown
+            soup = BeautifulSoup(markdown.markdown(alt_text), features="html.parser")
+            td2.text = ''.join(soup.stripped_strings)  # Extracts all text from the rendered Markdown, discarding the tags
+            
 
             # Convert the element to a string and return
             return etree.tostring(table, encoding="unicode")
@@ -244,23 +249,64 @@ class RawLinkExtension(Extension):
         md.preprocessors.register(RawLinkPreprocessor(md), "raw_link", 100)
 
 
-# Interlink for references
+# Old Interlink for references
+"""
 class ReferencesIdPreprocessor(Preprocessor):
-    def run(self, lines):
-        new_lines = []
-        for line in lines:
-            if line.lower().startswith("# references"):
-                line += " {#references}"
-            new_lines.append(line)
-        return new_lines
+   def run(self, lines):
+       new_lines = []
+       for line in lines:
+           if line.lower().startswith("#### references"):
+               line += " id=\"references\""
+           new_lines.append(line)
+       return new_lines
+
+
+class ReferencesIdExtension(Extension):
+   def extendMarkdown(self, md):
+       md.preprocessors.register(ReferencesIdPreprocessor(md), "references_id", 50)
+"""
+
+class ReferencesIdTreeprocessor(Treeprocessor):
+    def run(self, root):
+        for element in root.iter():
+            if element.tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                if "references" in element.text.lower():
+                    element.set("id", "references")
+        return root
 
 
 class ReferencesIdExtension(Extension):
     def extendMarkdown(self, md):
-        md.preprocessors.register(ReferencesIdPreprocessor(md), "references_id", 50)
+        md.treeprocessors.register(ReferencesIdTreeprocessor(md), "references_id", 50)
 
-
+        
 class StylingPostprocessor(Postprocessor):
+    def run(self, text):
+        text = self.format_text(text)
+        return text
+
+    def format_text(self, text):
+        # Split the document into three parts at the "References" and "Footnotes" heading
+        parts = re.split(r"(?si)(<h[1-6] id=\"references\">.*?</h[1-6]>|<h[1-6]>Footnotes.*?</h[1-6]>)", text)
+
+        # Apply text replacements to each part separately
+        if len(parts) >= 3:
+            # The text before References
+            parts[0] = re.sub(r"<p>", r'<p style="text-align: justify;">', parts[0])
+
+            # The text between References and Footnotes
+            parts[2] = re.sub(r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[2])
+
+            # The text after Footnotes
+            if len(parts) == 5:
+                parts[4] = re.sub(r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[4])
+
+        return "".join(parts)
+
+
+
+# Old sytling post processor    
+""" class StylingPostprocessor(Postprocessor):
     def run(self, text):
         text = self.format_text(text)
         return text
@@ -278,7 +324,7 @@ class StylingPostprocessor(Postprocessor):
 
         return "".join(parts)
 
-
+ """
 class StylingExtension(Extension):
     def extendMarkdown(self, md):
         md.postprocessors.register(StylingPostprocessor(md), "styling", 175)
@@ -294,17 +340,17 @@ def process(infile):
         text = f.read()
     html = markdown.markdown(
         text,
-        extensions=[
-            CodeBlockExtension(),
-            RawLinkExtension(),
-            MetaDataExtension(),
-            ImageExtension(),
-            ReferencesIdExtension(),
-            StylingExtension(),  # Add this line
-            "fenced_code",
+        extensions=["fenced_code",
             "tables",
             "footnotes",
             "admonition",
+            CodeBlockExtension(),
+#            InlineCodePreprocessor(),
+            ImageExtension(),
+            MetaDataExtension(),
+#            RawLinkExtension(),
+            ReferencesIdExtension(),
+            StylingExtension()
         ],
         extension_configs={"footnotes": {"PLACE_MARKER" : "///Footnotes///"}},
     )
