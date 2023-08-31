@@ -288,18 +288,18 @@ class StylingPostprocessor(Postprocessor):
     def format_text(self, text):
         # Split the document into three parts at the "References" and "Footnotes" heading
         parts = re.split(r"(?si)(<h[1-6] id=\"references\">.*?</h[1-6]>|<h[1-6]>Footnotes.*?</h[1-6]>)", text)
-
+        
         # Apply text replacements to each part separately
-        if len(parts) >= 3:
-            # The text before References
-            parts[0] = re.sub(r"<p>", r'<p style="text-align: justify;">', parts[0])
+        # The text before References
+        parts[0] = re.sub(r"<p>", r'<p style="text-align: justify;">', parts[0])
 
+        if len(parts) >= 3:
             # The text between References and Footnotes
             parts[2] = re.sub(r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[2])
 
-            # The text after Footnotes
-            if len(parts) == 5:
-                parts[4] = re.sub(r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[4])
+        # The text after Footnotes
+        if len(parts) == 5:
+            parts[4] = re.sub(r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[4])
 
         return "".join(parts)
 
@@ -340,17 +340,18 @@ def process(infile):
         text = f.read()
     html = markdown.markdown(
         text,
-        extensions=["fenced_code",
-            "tables",
-            "footnotes",
-            "admonition",
+        extensions=[
             CodeBlockExtension(),
-#            InlineCodePreprocessor(),
+#            InlineCodePreprocessor(), # I believe this is handled by fenced_code now
             ImageExtension(),
             MetaDataExtension(),
 #            RawLinkExtension(),
             ReferencesIdExtension(),
-            StylingExtension()
+            StylingExtension(),
+            "fenced_code",
+            "tables",
+            "footnotes",
+            "admonition",
         ],
         extension_configs={"footnotes": {"PLACE_MARKER" : "///Footnotes///"}},
     )
