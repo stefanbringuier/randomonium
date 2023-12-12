@@ -23,9 +23,58 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
+import emoji
+
+class LinkPreviewPostprocessor(Postprocessor):
+    def run(self, text):
+        soup = BeautifulSoup(text, 'html.parser')
+
+        # Extract references and footnotes text
+        references_text = self.extract_section_text(soup, 'References')
+        footnotes_text = self.extract_footnotes_text(soup)
+
+        # Add 'data-preview' attribute to internal links to references and footnotes
+        for a in soup.find_all('a', href=True):
+            if '#References' in a['href']:
+                a['data-preview'] = references_text
+            elif a['href'].startswith('#fn:'):
+                footnote_key = a['href'].lstrip('#')
+                a['data-preview'] = footnotes_text.get(footnote_key, '')
+
+            a['class'] = a.get('class', []) + ['preview-link']
+
+        return str(soup)
+
+    @staticmethod
+    def extract_section_text(soup, section_id):
+        section = soup.find('h4', string=lambda text: text and text.lower() == section_id.lower())
+        if not section:
+            return ''
+
+        # Accumulate text from all sibling elements after the section header
+        text = []
+        for sibling in section.find_next_siblings():
+            text.append(' '.join(sibling.stripped_strings))
+            if sibling.name and sibling.name.startswith('h'):
+                break  # Stop if another header is reached
+        return ' '.join(text)
+
+    @staticmethod
+    def extract_footnotes_text(soup):
+        footnotes = {}
+        for footnote in soup.find_all('div', class_='footnote'):
+            footnote_id = footnote.get('id', '')
+            footnotes[footnote_id] = ' '.join(footnote.stripped_strings)
+        return footnotes
+    
+class LinkPreviewExtension(Extension):
+    def extendMarkdown(self, md):
+        md.postprocessors.register(LinkPreviewPostprocessor(md), "link_preview", 175)
 
 class CodeBlockPreprocessor(Preprocessor):
-    CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
+    #CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
+    CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>[\s\S]+?)```", re.MULTILINE)
+
 
     def run(self, lines):
         def repl(m):
@@ -33,9 +82,11 @@ class CodeBlockPreprocessor(Preprocessor):
             if language is None:
                 language = "text"
             code = m.group("code")
-            lexer = get_lexer_by_name(language, stripall=True)
-            formatter = HtmlFormatter(nowrap=True)
-            code = highlight(code, lexer, formatter)
+            lexer = get_lexer_by_name(language,stripall=False)
+            formatter = HtmlFormatter(nowrap=False)
+            highlighted_code = highlight(code, lexer, formatter)
+            code = re.sub(r'</?pre.*?>', '', highlighted_code)
+            code = code.replace('\n\n', '\n<br>\n')
             return '\n\n<pre class="language-%s"><code>%s</code></pre>\n\n' % (
                 language,
                 code,
@@ -249,22 +300,20 @@ class RawLinkExtension(Extension):
         md.preprocessors.register(RawLinkPreprocessor(md), "raw_link", 100)
 
 
-# Old Interlink for references
-"""
-class ReferencesIdPreprocessor(Preprocessor):
-   def run(self, lines):
-       new_lines = []
-       for line in lines:
-           if line.lower().startswith("#### references"):
-               line += " id=\"references\""
-           new_lines.append(line)
-       return new_lines
+class EmojiPreprocessor(Preprocessor):
+    def run(self, lines):
+        new_lines = []
+        for line in lines:
+            line = emoji.emojize(line)  # Convert text-based emojis
+            #line = emoji.demojize(line)
+            new_lines.append(line)
+        return new_lines
 
+class EmojiExtension(Extension):
+    def extendMarkdown(self, md):
+        md.preprocessors.register(EmojiPreprocessor(md), "emoji_preprocessor", 175)
 
-class ReferencesIdExtension(Extension):
-   def extendMarkdown(self, md):
-       md.preprocessors.register(ReferencesIdPreprocessor(md), "references_id", 50)
-"""
+        
 
 class ReferencesIdTreeprocessor(Treeprocessor):
     def run(self, root):
@@ -303,28 +352,6 @@ class StylingPostprocessor(Postprocessor):
 
         return "".join(parts)
 
-
-
-# Old sytling post processor    
-""" class StylingPostprocessor(Postprocessor):
-    def run(self, text):
-        text = self.format_text(text)
-        return text
-
-    def format_text(self, text):
-        # Split the document into two parts at the "References" heading
-        parts = re.split(r"(?s)(<h[1-6]>References.*?</h[1-6]>)", text)
-
-        # Apply text replacements to each part separately
-        if len(parts) == 3:
-            parts[0] = re.sub(r"<p>", r'<p style="text-align: justify;">', parts[0])
-            parts[2] = re.sub(
-                r"<p>", r'<p style="text-align: left; font-size: 12px;">', parts[2]
-            )
-
-        return "".join(parts)
-
- """
 class StylingExtension(Extension):
     def extendMarkdown(self, md):
         md.postprocessors.register(StylingPostprocessor(md), "styling", 175)
@@ -342,16 +369,17 @@ def process(infile):
         text,
         extensions=[
             CodeBlockExtension(),
-#            InlineCodePreprocessor(), # I believe this is handled by fenced_code now
             ImageExtension(),
             MetaDataExtension(),
-#            RawLinkExtension(),
+#            RawLinkExtension(), #Not needed ?
             ReferencesIdExtension(),
             StylingExtension(),
+            EmojiExtension(), 
             "fenced_code",
             "tables",
             "footnotes",
             "admonition",
+            LinkPreviewExtension(),
         ],
         extension_configs={"footnotes": {"PLACE_MARKER" : "///Footnotes///"}},
     )
