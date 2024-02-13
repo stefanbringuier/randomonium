@@ -159,42 +159,37 @@ class ImageExtension(Extension):
     def extendMarkdown(self, md):
        md.preprocessors.register(ImagePreprocessor(md), 'image_preprocessor', 125)
 """
-
-
 class ImagePreprocessor(Preprocessor):
-    """
-    Provides image preprocessing.
-    1. Uses base64 encoding to put image in HTML.
-    2. Structure image in bloggerl like environment.
-    """
-
     IMAGE_RE = re.compile(r"!\[(.*?)\]\((.*?)\)")
+
+    def __init__(self, md, markdown_file_dir):
+        super().__init__(md)
+        self.markdown_file_dir = markdown_file_dir
 
     def run(self, lines):
         def repl(m):
             alt_text = m.group(1)
             image_path = m.group(2)
+            image_data = None
+            image_ext = None
 
             if image_path.startswith(("http://", "https://", "www")):
                 response = requests.get(image_path)
                 image_data = response.content
-                image_ext = os.path.splitext(image_path)[1][
-                    1:
-                ]  # image extension from URL
+                image_ext = os.path.splitext(image_path)[1][1:]  # Extension from URL
             else:
-                try:
-                    with open(image_path, "rb") as image_file:
+                # Resolve relative path for local files
+                full_image_path = os.path.join(self.markdown_file_dir, image_path)
+                if os.path.exists(full_image_path):
+                    with open(full_image_path, "rb") as image_file:
                         image_data = image_file.read()
-                    image_ext = os.path.splitext(image_path)[1][
-                        1:
-                    ]  # image extension from local file
-                except FileNotFoundError:
-                    return (
-                        m.group()
-                    )  # If the file isn't found, return the original match
+                    image_ext = os.path.splitext(full_image_path)[1][1:]  # Extension from local file
+                else:
+                    return m.group()  # Return original markdown if file not found
 
+            # Encode the image data
             encoded_string = base64.b64encode(image_data).decode()
-            data_url = "data:image/{};base64,{}".format(image_ext, encoded_string)
+            data_url = f"data:image/{image_ext};base64,{encoded_string}"
 
             table = etree.Element(
                 "table",
@@ -218,12 +213,9 @@ class ImagePreprocessor(Preprocessor):
                 "td",
                 attrib={"class": "tr-caption", "style": "text-align: center;"},
             )
-            # td2.text = alt_text
-            #td2.text = markdown.markdown(alt_text)  # Render the alt text as Markdown
             soup = BeautifulSoup(markdown.markdown(alt_text), features="html.parser")
             td2.text = ''.join(soup.stripped_strings)  # Extracts all text from the rendered Markdown, discarding the tags
             
-
             # Convert the element to a string and return
             return etree.tostring(table, encoding="unicode")
 
@@ -236,10 +228,48 @@ class ImagePreprocessor(Preprocessor):
 
 
 class ImageExtension(Extension):
+    def __init__(self, markdown_file_dir):
+        self.markdown_file_dir = markdown_file_dir
+
     def extendMarkdown(self, md):
-        image_preprocessor = ImagePreprocessor(md)
+        image_preprocessor = ImagePreprocessor(md, self.markdown_file_dir)
         md.preprocessors.register(image_preprocessor, "image_preprocessor", 125)
         md.preprocessors.deregister("html_block")
+
+class LatexPreprocessor(Preprocessor):
+    def process_latex_content(self, text):
+        # Replacing specific LaTeX commands using regular expressions
+        replacements = {
+            r'\\\\': r'\\\\\\\\',
+            '_': r'\_',  # Escaping Markdown underscore
+            '\*': r'\*',  # Escaping Markdown asterisk
+        }
+
+        for old, new in replacements.items():
+            text = re.sub(old, new, text)
+        return text
+
+    def run(self, lines):
+        # Concatenate lines into a single string
+        text = "\n".join(lines)
+        latex_pattern = re.compile(
+            r"(\$\$.*?\$\$|\$.*?\$)",
+            flags=re.DOTALL
+        )
+
+        # Apply replacements to the entire text
+        text = latex_pattern.sub(lambda m: self.process_latex_content(m.group(0)), text)
+
+        # Split back into lines
+        return text.split("\n")
+
+# Use this preprocessor in your Markdown processor
+
+
+
+class LatexExtension(Extension):
+    def extendMarkdown(self, md):
+        md.preprocessors.register(LatexPreprocessor(md), "latex_escape", 175)
 
 
 class MetaDataPreprocessor(Preprocessor):
@@ -363,18 +393,21 @@ class StylingExtension(Extension):
 
 
 def process(infile):
+    markdown_file_dir = os.path.dirname(os.path.abspath(infile))
+
     with open(infile, "r") as f:
         text = f.read()
     html = markdown.markdown(
         text,
         extensions=[
+            LatexExtension(),
             CodeBlockExtension(),
-            ImageExtension(),
+            ImageExtension(markdown_file_dir),
             MetaDataExtension(),
 #            RawLinkExtension(), #Not needed ?
             ReferencesIdExtension(),
             StylingExtension(),
-            EmojiExtension(), 
+            EmojiExtension(),
             "fenced_code",
             "tables",
             "footnotes",

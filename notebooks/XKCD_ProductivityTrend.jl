@@ -21,7 +21,6 @@ end
 # ╔═╡ 70e2fff3-5363-49ee-bc6f-01b1420ec6fd
 begin
 	using Dates
-	using EmojiSymbols
 end
 
 # ╔═╡ c1980649-d443-4bae-b108-25f4d3a603c9
@@ -103,7 +102,9 @@ begin
 
 	# Credit
 	annotate!([(4, -23, text("© S. Bringuier", 8, :black))])
-	
+
+
+	savefig("/home/stefanbringuier/GoogleDrive/NOTES_WRITEUPS_PRES/WRITEUPS/Blogs/DiracsStudent/resources/XKCDProductivity.png")
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
