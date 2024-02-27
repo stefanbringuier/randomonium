@@ -391,6 +391,26 @@ class StylingExtension(Extension):
     def extendMarkdown(self, md):
         md.postprocessors.register(StylingPostprocessor(md), "styling", 175)
 
+class IncludeHTMLPostprocessor(Postprocessor):
+    def run(self, text):
+        def replace_include(match):
+            filename = match.group(1)
+            try:
+                with open(filename, 'r') as f:
+                    html_content = f.read()
+                return html_content
+            except FileNotFoundError:
+                # If the file is not found, return the original placeholder or handle it appropriately
+                return match.group(0)
+        
+        # Use re.sub to find the pattern and replace it by reading the file content
+        new_text = re.sub(r'\{\{\s*include\s+(.*?)\s*\}\}', replace_include, text)
+        return new_text
+
+class IncludeHTMLExtension(Extension):
+    def extendMarkdown(self, md):
+        md.postprocessors.register(IncludeHTMLPostprocessor(md), 'include_html', 25)
+
 
 def process(infile):
     markdown_file_dir = os.path.dirname(os.path.abspath(infile))
@@ -413,6 +433,7 @@ def process(infile):
             "footnotes",
             "admonition",
             LinkPreviewExtension(),
+            IncludeHTMLExtension()
         ],
         extension_configs={"footnotes": {"PLACE_MARKER" : "///Footnotes///"}},
     )
