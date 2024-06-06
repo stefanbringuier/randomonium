@@ -83,13 +83,19 @@ def main(input,output,timestep=0.001):
     """
     timestep is the time in picoseconds between frames!
     """
+
     # Read all frames using ASE
     if input.endswith('xml'):
         frames = read(input, format='vasp-xml', index=':')
+        potim = frames[0].calc.parameters['potim']
+        nblock = frames[0].calc.parameters['nblock']
+        dt = (potim / 1000) * nblock
     else:
         frames = read(input, format='vasp-xdatcar', index=':')
+        dt = timestep
 
-    calculate_velocities(frames, timestep)
+    # Calculate velocities
+    calculate_velocities(frames, dt)
  
     if output.startswith('dump') or output.endswith('dump'):
         write_lammps_dump(frames,output=output)
