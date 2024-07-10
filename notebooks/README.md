@@ -2,6 +2,10 @@
 
 Contains random collection of [Jupyter](https://jupyter.org/), [Quarto](https://quarto.org/), and [Pluto.jl](https://plutojl.org/) notebooks.
 
+> 🚀
+> Pluto notebooks can be viewed in HTML [here](https://stefanbringuier.github.io/randomonium)
+
+
 ## File descriptions
 - [BindingCurveIllustration.jl](BindingCurveIllustration.jl) - Find myself always needing this illustration for teaching purposes. Very basic visual.
 - [QuAcc_Phonon_QE_Example.ipynb](QuAcc_Phonon_QE_Example.ipynb) - Google colab showing [QuAcc](https://quantum-accelerators.github.io/quacc/index.html) package.
