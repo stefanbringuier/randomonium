@@ -71,6 +71,51 @@ class LinkPreviewExtension(Extension):
     def extendMarkdown(self, md):
         md.postprocessors.register(LinkPreviewPostprocessor(md), "link_preview", 175)
 
+class CustomCSSPostprocessor(Postprocessor):
+    def run(self, text):
+        custom_css = """
+        <style>
+        .custom-table {
+            border-collapse: collapse;
+            font-size: 10.5px; 
+            width: 100%;
+        }
+        .custom-table th, .custom-table td {
+            padding: 1px;
+            text-align: left;
+        }
+        .custom-table th {
+            background-color: #d3d3d3;
+            color: #000;
+            border-bottom: 1px solid #000; 
+            border-top: 1.5px solid #000; 
+        }
+        .custom-table tr:first-child td{
+            border-top: 1.0px solid #000;
+        }
+        .custom-table tr:last-child td {
+            border-bottom: 1.5px solid #000; 
+        }
+        </style>
+        """
+        return custom_css + text  # Insert the custom CSS at the beginning of the HTML
+
+class TableClassPostprocessor(Postprocessor):
+    def run(self, text):
+        soup = BeautifulSoup(text, 'html.parser')
+        for table in soup.find_all('table'):
+            table['class'] = table.get('class', []) + ['custom-table']
+        return str(soup)
+    
+class CustomCSSExtension(Extension):
+    def extendMarkdown(self, md):
+        md.postprocessors.register(CustomCSSPostprocessor(md), 'custom_css', 5)
+
+
+class TableClassExtension(Extension):
+    def extendMarkdown(self, md):
+        md.postprocessors.register(TableClassPostprocessor(md), 'table_class', 5)
+
 class CodeBlockPreprocessor(Preprocessor):
     #CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
     CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>[\s\S]+?)```", re.MULTILINE)
@@ -433,7 +478,9 @@ def process(infile):
             "footnotes",
             "admonition",
             LinkPreviewExtension(),
-            IncludeHTMLExtension()
+            IncludeHTMLExtension(),
+            CustomCSSExtension(),
+            TableClassExtension()
         ],
         extension_configs={"footnotes": {"PLACE_MARKER" : "///Footnotes///"}},
     )
