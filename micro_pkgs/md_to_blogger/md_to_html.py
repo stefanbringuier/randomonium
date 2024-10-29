@@ -11,16 +11,16 @@ from xml.etree.ElementTree import Element
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 
-
+import html
+from html import escape
 import re
 import sys
 import os
 import base64
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name, TextLexer
-from pygments.formatters import HtmlFormatter, RawTokenFormatter
-from urllib.parse import urlparse
-
+from pygments.formatters import HtmlFormatter
+from pygments.util import ClassNotFound
 from bs4 import BeautifulSoup
 
 import emoji
@@ -116,31 +116,75 @@ class TableClassExtension(Extension):
     def extendMarkdown(self, md):
         md.postprocessors.register(TableClassPostprocessor(md), 'table_class', 5)
 
-class CodeBlockPreprocessor(Preprocessor):
-    #CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
-    CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>[\s\S]+?)```", re.MULTILINE)
 
+# Works but not super robust
+# class CodeBlockPreprocessor(Preprocessor):
+#     #CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>.+?)```", re.DOTALL)
+#     CODE_BLOCK_RE = re.compile(r"```(?P<language>\w+)?\n(?P<code>[\s\S]+?)```", re.MULTILINE)
+
+
+#     def run(self, lines):
+#         def repl(m):
+#             language = m.group("language")
+#             if language is None:
+#                 language = "text"
+#             code = m.group("code")
+#             lexer = get_lexer_by_name(language,stripall=False)
+#             formatter = HtmlFormatter(nowrap=False)
+#             highlighted_code = highlight(code, lexer, formatter)
+#             code = re.sub(r'</?pre.*?>', '', highlighted_code)
+#             code = code.replace('\n\n', '\n<br>\n')
+#             return '\n\n<pre class="language-%s"><code>%s</code></pre>\n\n' % (
+#                 language,
+#                 code,
+#             )
+
+
+#         text = "\n".join(lines)
+#         text = self.CODE_BLOCK_RE.sub(repl, text)
+#         return text.split("\n")
+
+# Attempt at more robust
+class CodeBlockPreprocessor:
+    CODE_BLOCK_RE = re.compile(r'(?P<fence>^```(?P<lang>\w+)?\n)(?P<code>(.|\n)*?)(?P=fence)', re.MULTILINE)
+
+    def __init__(self, **options):
+        self.formatter = HtmlFormatter(**options)
 
     def run(self, lines):
-        def repl(m):
-            language = m.group("language")
-            if language is None:
-                language = "text"
-            code = m.group("code")
-            lexer = get_lexer_by_name(language,stripall=False)
-            formatter = HtmlFormatter(nowrap=False)
-            highlighted_code = highlight(code, lexer, formatter)
-            code = re.sub(r'</?pre.*?>', '', highlighted_code)
-            code = code.replace('\n\n', '\n<br>\n')
-            return '\n\n<pre class="language-%s"><code>%s</code></pre>\n\n' % (
-                language,
-                code,
-            )
+        def process_line(line):
+            if not hasattr(self, 'current_block'):
+                match = re.match(r'^```(\w+)?$', line)
+                if match:
+                    self.current_block = {'lang': match.group(1) or 'text', 'code': []}
+                    return None
+                return line
+            
+            if line.strip() == '```':
+                code = '\n'.join(self.current_block['code'])
+                result = self._highlight_code(self.current_block['lang'], code)
+                delattr(self, 'current_block')
+                return result
+            
+            self.current_block['code'].append(line)
+            return None
 
-        text = "\n".join(lines)
-        text = self.CODE_BLOCK_RE.sub(repl, text)
-        return text.split("\n")
+        result = []
+        for line in lines:
+            processed = process_line(line)
+            if processed is not None:
+                result.append(processed)
+        
+        return result
 
+    def _highlight_code(self, lang, code):
+        try:
+            lexer = get_lexer_by_name(lang, stripall=True)
+        except ValueError:
+            lexer = TextLexer()
+        
+        highlighted = highlight(escape(code), lexer, self.formatter)
+        return f'<div class="code-block {lang}">{highlighted}</div>'
 
 class InlineCodePreprocessor(Preprocessor):
     INLINE_CODE_RE = re.compile(r"`(?P<code>.+?)`", re.DOTALL)
@@ -465,18 +509,18 @@ def process(infile):
     html = markdown.markdown(
         text,
         extensions=[
-            LatexExtension(),
             CodeBlockExtension(),
+            LatexExtension(),
+            "fenced_code",
+            "tables",
+            "footnotes",
+            "admonition",
             ImageExtension(markdown_file_dir),
             MetaDataExtension(),
 #            RawLinkExtension(), #Not needed ?
             ReferencesIdExtension(),
             StylingExtension(),
             EmojiExtension(),
-            "fenced_code",
-            "tables",
-            "footnotes",
-            "admonition",
             LinkPreviewExtension(),
             IncludeHTMLExtension(),
             CustomCSSExtension(),
