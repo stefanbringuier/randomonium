@@ -20,6 +20,7 @@ Contains random collection of [Jupyter](https://jupyter.org/), [Quarto](https://
 - [BasicPlutoTemplate.jl](BasicPlutoTemplate.jl) - contains some standard packages, table for package versions, and a way to somewhat create a reference list.
   
 ### Jupyter
+- [AutoMorse Fit](AutoMorse.ipynb) - Just provide diatomic molecule to get Quant. Chem calcs to fit Morse. 
 - [LennardJones_CPU_v_GPU.ipynb](LennardJones_CPU_v_GPU.ipynb) - Benchmark PyCUDA/GPU for LJ against single CPU.
 - [PyCalphadExample_Blog_PhaseDiagram.ipynb](PyCalphadExample_Blog_PhaseDiagram.ipynb) - notebook on example for using pycalphad.
 - [BayesianOptimization_Ch2_JuliaVersion.ipynb](BayesianOptimization_Ch2_JuliaVersion.ipynb) - Implementation of the example given in D. Packwood Bayes Opt. [book](https://link.springer.com/book/10.1007/978-981-10-6781-5).
